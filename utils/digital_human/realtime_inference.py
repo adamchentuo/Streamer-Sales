@@ -60,12 +60,14 @@ def setup_ffmpeg_env(model_dir):
 
 def init_digital_model(model_dir, use_float16=False):
 
-    os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-    from huggingface_hub import snapshot_download
+    # os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+    # from huggingface_hub import snapshot_download
 
     # 直接下载单个文件
-    muse_talk_model_path = snapshot_download(repo_id="TMElyralab/MuseTalk", local_dir=model_dir)
-    sd_model_path = snapshot_download(repo_id="stabilityai/sd-vae-ft-mse", local_dir=Path(model_dir).joinpath("sd-vae-ft-mse"))
+    # muse_talk_model_path = snapshot_download(repo_id="TMElyralab/MuseTalk", local_dir=model_dir)
+    muse_talk_model_path = model_dir
+    # sd_model_path = snapshot_download(repo_id="stabilityai/sd-vae-ft-mse", local_dir=Path(model_dir).joinpath("sd-vae-ft-mse"))
+    sd_model_path = Path(model_dir).joinpath("sd-vae-ft-mse")
 
     whisper_pth_path = Path(model_dir).joinpath(r"whisper/tiny.pt")
     whisper_pth_path.parent.mkdir(parents=True, exist_ok=True)
@@ -99,26 +101,30 @@ def load_pose_model(model_dir):
 
     from mmpose.apis import init_model
 
-    os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-    from huggingface_hub import hf_hub_download
+    # os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+    # from huggingface_hub import hf_hub_download
 
     # 直接下载单个文件
-    dw_pose_path = hf_hub_download(
-        repo_id="yzd-v/DWPose",
-        filename="dw-ll_ucoco_384.pth",
-        local_dir=Path(model_dir).joinpath("dwpose"),
-    )
-
+    # dw_pose_path = hf_hub_download(
+    #     repo_id="yzd-v/DWPose",
+    #     filename="dw-ll_ucoco_384.pth",
+    #     local_dir=Path(model_dir).joinpath("dwpose"),
+    # )
+    # dw_pose_path = Path(model_dir).joinpath("dwpose").joinpath("dw-ll_ucoco_384.pth")
+    
+    dw_pose_path = r"./work_dirs/digital_human_weights/dwpose/dw-ll_ucoco_384.pth"
+    print("1==============dw_pose_path==",dw_pose_path)
     config_file = r"./utils/digital_human/musetalk/utils/dwpose/rtmpose-l_8xb32-270e_coco-ubody-wholebody-384x288.py"
     pose_model = init_model(config_file, dw_pose_path, device="cuda")
+    print("pose_model======end")
 
     return pose_model
 
 
 def load_face_parsing_model(model_dir):
 
-    os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-    from huggingface_hub import hf_hub_download
+    # os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+    # from huggingface_hub import hf_hub_download
 
     model_dir = Path(model_dir).joinpath("face-parse-bisent")
     model_dir.mkdir(parents=True, exist_ok=True)
@@ -133,12 +139,12 @@ def load_face_parsing_model(model_dir):
 
     # 79999_iter.pth 地址: https://drive.google.com/open?id=154JgKpzCPW82qINcVieuPH3fZ2e0P812
     # 非官方
-    _ = hf_hub_download(
-        repo_id="ManyOtherFunctions/face-parse-bisent",
-        filename="79999_iter.pth",
-        local_dir=str(model_dir),
-    )
-
+    # _ = hf_hub_download(
+    #     repo_id="ManyOtherFunctions/face-parse-bisent",
+    #     filename="79999_iter.pth",
+    #     local_dir=str(model_dir),
+    # )
+    print("=================init_face_parsing_model")
     face_parsing_model = init_face_parsing_model(
         resnet_path=str(resnet_path),
         face_model_pth=Path(model_dir).joinpath("79999_iter.pth"),
@@ -203,13 +209,20 @@ class Avatar:
         self.idx = 0
 
         # 模型初始化，防止 pose 导致 OOM，放到最后加载
+        
+        print("begin excute -------load_face_parsing_model")
         face_parsing_model = load_face_parsing_model(self.model_dir)
+        print("done  excute -------load_face_parsing_model")
+        
+        print("begin excute -------init_digital_model")
         audio_processor, vae, unet, pe = init_digital_model(self.model_dir, use_float16=False)
+        print("done excute -------init_digital_model")
         pe = pe.half()
         vae.vae = vae.vae.half()
         unet.model = unet.model.half()
-
+        print("begin excute -------self.init")
         self.init(vae_model=vae, face_parsing_model=face_parsing_model)
+        print("done excute -------self.init")
 
         self.model_handler = HandlerDigitalHuman(
             audio_processor=audio_processor,
@@ -225,16 +238,21 @@ class Avatar:
             fps=fps,
             bbox_shift=bbox_shift,
         )
+        
+        print("done excute --------------HandlerDigitalHuman")
 
     def init(self, vae_model, face_parsing_model):
         need_to_prepare = False
+        # print("1111111111111111111")
 
         if self.preparation_force and os.path.exists(self.avatar_path):
             shutil.rmtree(self.avatar_path)
             need_to_prepare = True
+            # print("21111111111111111111")
         elif not os.path.exists(self.avatar_path):
             # 预处理文件不存在，需要进行预处理
             need_to_prepare = True
+            # print("31111111111111111111")
         elif os.path.exists(self.avatar_path):
             # 预处理文件存在，判断 bbox_shift 是否匹配，不匹配需要重新进行预处理
             with open(self.avatar_info_path, "r") as f:
@@ -242,6 +260,7 @@ class Avatar:
             if avatar_info["bbox_shift"] != self.avatar_info["bbox_shift"]:
                 need_to_prepare = True
                 shutil.rmtree(self.avatar_path)
+            # print("41111111111111111111")
 
         if need_to_prepare:
             print("*********************************")
@@ -249,7 +268,7 @@ class Avatar:
             print("*********************************")
             osmakedirs([self.avatar_path, self.full_imgs_path, self.video_out_path, self.mask_out_path])
             self.prepare_material(vae_model=vae_model, face_parsing_model=face_parsing_model)
-
+        # print("5111111111111111111")
         self.input_latent_list_cycle = torch.load(self.latents_out_path)
         with open(self.coords_path, "rb") as f:
             self.coord_list_cycle = pickle.load(f)
@@ -260,6 +279,7 @@ class Avatar:
             self.mask_coords_list_cycle = pickle.load(f)
         input_mask_list = glob.glob(os.path.join(self.mask_out_path, "*.[jpJP][pnPN]*[gG]"))
         input_mask_list = sorted(input_mask_list, key=lambda x: int(os.path.splitext(os.path.basename(x))[0]))
+        # print("61111111111111111111")
         self.mask_list_cycle = read_imgs(input_mask_list)
 
     def prepare_material(self, vae_model, face_parsing_model):
@@ -280,7 +300,9 @@ class Avatar:
 
         print("extracting landmarks...")
         pose_model = load_pose_model(self.model_dir)
+        print("load_pose_model-----end")
         coord_list, frame_list = get_landmark_and_bbox(input_img_list, pose_model, self.bbox_shift)
+        print("get_landmark_and_bbox-----end")
         del pose_model
 
         input_latent_list = []
