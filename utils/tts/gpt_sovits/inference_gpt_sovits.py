@@ -478,7 +478,8 @@ def get_tts_model(voice_character_name="艾丝妲", save_dir="./work_dirs/gpt_so
     ref_wav_path = Path(tts_star_model_root).joinpath("参考音频", inf_name)
 
     # https://huggingface.co/lj1995/GPT-SoVITS/tree/main
-    tts_model_dir = snapshot_download(repo_id="lj1995/GPT-SoVITS", local_dir="./work_dirs/gpt_sovits_weights/pretrain")
+    # tts_model_dir = snapshot_download(repo_id="lj1995/GPT-SoVITS", local_dir="./work_dirs/gpt_sovits_weights/pretrain")
+    tts_model_dir="./work_dirs/gpt_sovits_weights/pretrain"
     cnhubert_base_path = os.path.join(tts_model_dir, "chinese-hubert-base")
     bert_path = os.path.join(tts_model_dir, "chinese-roberta-wwm-ext-large")
 
@@ -486,6 +487,7 @@ def get_tts_model(voice_character_name="艾丝妲", save_dir="./work_dirs/gpt_so
     print(f"bert_path dir = {bert_path}")
 
     print("Loading tts bert model...")
+    print("test==============================")
     bert_tokenizer = AutoTokenizer.from_pretrained(bert_path)
     bert_model = AutoModelForMaskedLM.from_pretrained(bert_path)
     if is_half:
@@ -553,8 +555,9 @@ def get_tts_model(voice_character_name="艾丝妲", save_dir="./work_dirs/gpt_so
     print("=" * 20, "\n音频参考文本:", prompt_text)
 
     if not ref_free:
+        print("0==================================")
         phones1, bert1, _ = get_phones_and_bert(prompt_text, bert_tokenizer, bert_model, dict_language["中英混合"], is_half)
-
+    print("1==================================")
     tts_handler = HandlerTTS(
         bert_tokenizer=bert_tokenizer,
         bert_model=bert_model,
@@ -571,6 +574,8 @@ def get_tts_model(voice_character_name="艾丝妲", save_dir="./work_dirs/gpt_so
         phones1=phones1,
         zero_wav=zero_wav,
     )
+    
+    print("2==================================")
 
     return tts_handler
 
